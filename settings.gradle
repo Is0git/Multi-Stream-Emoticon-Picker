@@ -1,0 +1,2 @@
+include ':app', ':multistreamemotespicker'
+rootProject.name='multi_stream_emoticon_picker'

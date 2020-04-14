@@ -5,41 +5,63 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
-import androidx.fragment.app.FragmentPagerAdapter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.android.multistreamchat.chat.chat_emotes.EmotesManager
 import com.example.multistreamemotespicker.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-class EmotesViewpagerAdapter<K, T>(var onBindHolder: (holder: EmotesViewpagerAdapter.MyViewHolder<T>?, item: List<T>?, position: Int) -> Unit) : RecyclerView.Adapter<EmotesViewpagerAdapter.MyViewHolder<T>>() {
+class EmotesViewpagerAdapter<T : EmotesManager.Emote>(
+    var onBindHolder: (holder: MyViewHolder<T>?, item: List<T>?, position: Int) -> Unit,
+    var onBindEmoteItem: (holder: EmoteSetItemAdapter.MyViewHolder, dataItem: T) -> Unit
+) : RecyclerView.Adapter<EmotesViewpagerAdapter.MyViewHolder<T>>() {
 
-    var data: MutableMap<K, List<T>>? = mutableMapOf()
+    var data: MutableMap<String, List<T>>? = mutableMapOf()
 
 
-    fun putData(data: K, list: List<T>) {
+    fun putData(data: String, list: List<T>) {
         this.data?.put(data, list)
+        this.data?.put("search", mutableListOf())
         notifyDataSetChanged()
     }
 
-    class MyViewHolder<T>(view: View) : RecyclerView.ViewHolder(view) {
+    @Suppress("unchecked_cast")
+    suspend fun searchItem(
+        text: String,
+        emotes: MutableMap<out Any?, out List<EmotesManager.Emote>>?
+    ) {
+        val list = mutableListOf<T>()
+        emotes?.forEach {
+            it.value.forEach { emote ->
+                if (emote.code?.contains(text, true)!!) list.add(emote as T)
+            }
+        }
+        data?.put("search", list)
+        withContext(Dispatchers.Main) { notifyDataSetChanged() }
+    }
 
-        var adapter: EmoteSetItemAdapter? = EmoteSetItemAdapter()
+    class MyViewHolder<T : EmotesManager.Emote>(
+        view: View,
+        onBindEmoteItem: (holder: EmoteSetItemAdapter.MyViewHolder, dataItem: T) -> Unit
+    ) : RecyclerView.ViewHolder(view) {
+
+        var adapter: EmoteSetItemAdapter<T>? = EmoteSetItemAdapter(onBindEmoteItem)
 
         var list: RecyclerView = view.findViewById(R.id.emotes_list)
 
         init {
             list.apply {
                 adapter = this@MyViewHolder.adapter
-                (layoutManager as GridLayoutManager).spanCount =calculateSpanCount()
+                (layoutManager as GridLayoutManager).spanCount = calculateSpanCount()
             }
-
         }
+
         var emoteSetName: TextView = view.findViewById(R.id.emotes_set_name)
 
-        private fun calculateSpanCount() : Int{
-            val displayMetrics =   itemView.context.resources.displayMetrics
-            val px =TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 35f, displayMetrics)
+        private fun calculateSpanCount(): Int {
+            val displayMetrics = itemView.context.resources.displayMetrics
+            val px = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 35f, displayMetrics)
             val spanCount = (displayMetrics.widthPixels / px).toInt()
             return spanCount.coerceAtMost(7)
         }
@@ -47,21 +69,20 @@ class EmotesViewpagerAdapter<K, T>(var onBindHolder: (holder: EmotesViewpagerAda
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder<T> {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.emotes_list, parent, false)
-        return MyViewHolder(view)
+        return MyViewHolder(view, onBindEmoteItem)
     }
 
     override fun getItemCount(): Int {
-      return data?.count() ?: 0
+        return data?.count() ?: 0
     }
 
-
-
-    override fun getItemViewType(position: Int): Int {
-        return super.getItemViewType(position)
-    }
 
     override fun onBindViewHolder(holder: MyViewHolder<T>, position: Int) {
-        onBindHolder(holder, data?.values?.elementAt(position), position)
+        onBindHolder(
+            holder,
+            if (position == itemCount - 1) data?.get("search") else data?.values?.elementAt(position),
+            position
+        )
     }
 
 }

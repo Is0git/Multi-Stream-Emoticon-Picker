@@ -23,6 +23,8 @@ class EmoticonPickerLayout : ConstraintLayout {
         init(context, attrs)
     }
 
+    var onSearchTextChange: ((text: String?) -> Unit)? = null
+
      var emotesSearchBar: SearchView? = null
 
      var emotesTabLayout: TabLayout? = null
@@ -31,16 +33,29 @@ class EmoticonPickerLayout : ConstraintLayout {
 
     private fun init(context: Context?, attrs: AttributeSet? = null) {
 
-        emotesSearchBar = SearchView(context).also { it.id = R.id.emote_search_bar }
+        emotesSearchBar = SearchView(context).also {
+            it.id = R.id.emote_search_bar
+            it.setOnSearchClickListener { emotesViewPager?.setCurrentItem(emotesViewPager?.adapter?.itemCount?.minus(1) ?: 0, true)}
+            it.setOnCloseListener { emotesViewPager?.setCurrentItem(0, true).let { false } }
+            it.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+                override fun onQueryTextSubmit(query: String?): Boolean {
+                    return true
+                }
+
+                override fun onQueryTextChange(newText: String?): Boolean {
+                    onSearchTextChange?.invoke(newText)
+                    return false
+                }
+
+            })
+        }
 
         emotesTabLayout = TabLayout(context!!).also {
             it.id = R.id.emotes_tab_layout
             it.tabMode = TabLayout.MODE_SCROLLABLE
-
         }
 
         emotesViewPager = ViewPager2(context).also { it.id = R.id.emotes_viewpager }
-
 
         addView(emotesSearchBar)
         addView(emotesTabLayout)
